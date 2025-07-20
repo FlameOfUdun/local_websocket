@@ -1,4 +1,5 @@
-library;
+export 'src/models/discovered_server.dart';
 
-export 'src/websocket_server.dart';
-export 'src/websocket_client.dart';
+export 'src/utilities/scanner.dart';
+export 'src/utilities/server.dart';
+export 'src/utilities/client.dart';
