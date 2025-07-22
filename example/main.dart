@@ -16,7 +16,7 @@ void main(List<String> args) async {
   print('Server started');
 
   print('Scanning for servers...');
-  final result = await Scanner.scan("127.0.0.1");
+  final result = await Scanner.scan("127.0.0.1").first;
   final path = result.firstOrNull?.path;
   if (path == null) {
     print('No servers found');

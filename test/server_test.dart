@@ -53,9 +53,9 @@ void main() {
 
     test('scanner should find the server', () async {
       await server.start('127.0.0.1');
-      final discovered = await Scanner.scan("127.0.0.1");
-      expect(discovered, isNotEmpty);
-      expect(discovered.first.path, equals('ws://127.0.0.1:8080/ws'));
+      expect(Scanner.scan("127.0.0.1"), isA<Stream<List<DiscoveredServer>>>());
+      expect(await Scanner.scan("127.0.0.1").first, isNotEmpty);
+      expect((await Scanner.scan("127.0.0.1").first).first.path, equals('ws://127.0.0.1:8080/ws'));
     });
 
     test('should connect/disconnect client', () async {

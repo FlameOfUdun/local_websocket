@@ -3,19 +3,30 @@ import 'package:dio/dio.dart';
 import '../models/discovered_server.dart';
 
 final class Scanner {
-  Scanner._();
-
-  static Future<List<DiscoveredServer>> scan(String host, {
+  static Stream<List<DiscoveredServer>> scan(
+    String host, {
+    String type = 'flutter-local-websocket',
     int port = 8080,
-  }) async {
-    final subnet = _subnet(host);
-    final tasks = <Future<DiscoveredServer?>>[];
-    for (var ip = 0; ip <= 255; ip++) {
-      tasks.add(_check(subnet, ip, port));
-    }
+    Duration interval = const Duration(seconds: 3),
+  }) async* {
+    while (true) {
+      final subnet = _subnet(host);
+      final tasks = List<Future<DiscoveredServer?>>.generate(
+        256,
+        (ip) {
+          return _check(
+            subnet: subnet,
+            ip: ip,
+            port: port,
+            type: type,
+          );
+        },
+      );
+      final result = await Future.wait(tasks);
+      yield result.nonNulls.toList();
 
-    final result = await Future.wait(tasks);
-    return result.nonNulls.toList();
+      await Future.delayed(interval);
+    }
   }
 
   static String _subnet(String host) {
@@ -34,23 +45,30 @@ final class Scanner {
     throw ArgumentError('Invalid host format: $host');
   }
 
-  static Future<DiscoveredServer?> _check(String subnet, int ip, int port) async {
+  static Future<DiscoveredServer?> _check({
+    required String subnet,
+    required int ip,
+    required int port,
+    required String type,
+  }) async {
     final client = Dio(BaseOptions(
       receiveTimeout: const Duration(seconds: 1),
       connectTimeout: const Duration(seconds: 1),
       sendTimeout: const Duration(seconds: 1),
       validateStatus: (status) => status == 200,
     ));
+
     try {
       final response = await client.get('http://$subnet.$ip:$port');
       final server = response.headers['Server']?.first;
-      if (server == null || !server.contains('flutter-local-websocket')) return null;
-      final data = response.data;
+      if (server == null || !server.contains(type)) {
+        return null;
+      }
       return DiscoveredServer(
         path: 'ws://$subnet.$ip:$port/ws',
-        details: data,
+        details: response.data ?? <String, dynamic>{},
       );
-    } catch (e) {
+    } catch (_) {
       return null;
     } finally {
       client.close();
