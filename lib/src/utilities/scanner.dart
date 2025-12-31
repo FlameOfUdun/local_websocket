@@ -1,79 +1,106 @@
 part of '../source.dart';
 
-/// A utility class for scanning a local network for available WebSocket servers.
-final class Scanner {
-  /// Scans the local network for WebSocket servers of the specified [type] and [port].
-  /// By default, it scans for servers of type 'local-websocket' on port 8080.
-  /// The scan runs at the specified [interval].
+/// Scanner for discovering WebSocket servers on the network
+class Scanner {
+  /// Scan for servers on the given [host] and [port]
+  /// 
+  /// The [host] can be:
+  /// - A specific host: 'localhost', '192.168.1.100'
+  /// - A subnet: '192.168.1' (will scan .1 to .254)
+  /// 
+  /// Returns a Stream that emits lists of discovered servers every [interval]
   static Stream<List<DiscoveredServer>> scan(
     String host, {
-    String type = 'local-websocket',
     int port = 8080,
     Duration interval = const Duration(seconds: 3),
+    Duration timeout = const Duration(seconds: 1),
   }) async* {
     while (true) {
-      final subnet = _subnet(host);
-      final tasks = List<Future<DiscoveredServer?>>.generate(
-        256,
-        (ip) {
-          return _check(
-            subnet: subnet,
-            ip: ip,
-            port: port,
-            type: type,
-          );
-        },
-      );
-      final result = await Future.wait(tasks);
-      yield result.nonNulls.toList();
-
+      final servers = await _scanOnce(host, port: port, timeout: timeout);
+      yield servers;
       await Future.delayed(interval);
     }
   }
 
-  static String _subnet(String host) {
-    if (host == 'localhost' || host == '127.0.0.1') {
-      return '127.0.0';
-    }
+  /// Perform a single scan
+  static Future<List<DiscoveredServer>> _scanOnce(
+    String host, {
+    required int port,
+    required Duration timeout,
+  }) async {
+    final servers = <DiscoveredServer>[];
 
-    if (host.contains('.')) {
-      final parts = host.split('.');
-      if (parts.length < 3) {
-        throw ArgumentError('Invalid host format: $host');
+    // Check if host is a subnet (e.g., '192.168.1')
+    if (_isSubnet(host)) {
+      // Scan all addresses in subnet
+      final futures = <Future<DiscoveredServer?>>[];
+      for (int i = 1; i < 255; i++) {
+        final address = '$host.$i';
+        futures.add(_checkServer(address, port, timeout));
       }
-      return '${parts[0]}.${parts[1]}.${parts[2]}';
+
+      final results = await Future.wait(futures);
+      servers.addAll(results.whereType<DiscoveredServer>());
+    } else {
+      // Single host scan
+      final result = await _checkServer(host, port, timeout);
+      if (result != null) {
+        servers.add(result);
+      }
     }
 
-    throw ArgumentError('Invalid host format: $host');
+    return servers;
   }
 
-  static Future<DiscoveredServer?> _check({
-    required String subnet,
-    required int ip,
-    required int port,
-    required String type,
-  }) async {
-    final client = dio.Dio(dio.BaseOptions(
-      receiveTimeout: const Duration(seconds: 1),
-      connectTimeout: const Duration(seconds: 1),
-      sendTimeout: const Duration(seconds: 1),
-      validateStatus: (status) => status == 200,
-    ));
-
+  /// Check if a server exists at the given address
+  static Future<DiscoveredServer?> _checkServer(
+    String host,
+    int port,
+    Duration timeout,
+  ) async {
     try {
-      final response = await client.get('http://$subnet.$ip:$port');
-      final server = response.headers['Server']?.first;
-      if (server == null || !server.contains(type)) {
-        return null;
+      final client = HttpClient();
+      client.connectionTimeout = timeout;
+
+      final request = await client
+          .getUrl(Uri.parse('http://$host:$port/'))
+          .timeout(timeout);
+
+      final response = await request.close().timeout(timeout);
+
+      if (response.statusCode == 200) {
+        // Check if it's a local-websocket server
+        final serverHeader = response.headers.value('server');
+        if (serverHeader != null && serverHeader.contains('local-websocket')) {
+          // Read response body
+          final body = await response.transform(utf8.decoder).join();
+          final details = jsonDecode(body) as Map<String, dynamic>;
+
+          client.close();
+          return DiscoveredServer(
+            path: 'ws://$host:$port/ws',
+            details: details,
+          );
+        }
       }
-      return DiscoveredServer(
-        path: 'ws://$subnet.$ip:$port/ws',
-        details: response.data ?? <String, dynamic>{},
-      );
-    } catch (_) {
-      return null;
-    } finally {
+
       client.close();
+      return null;
+    } catch (e) {
+      return null;
     }
+  }
+
+  /// Check if the host string represents a subnet
+  static bool _isSubnet(String host) {
+    // A subnet is an incomplete IP address (e.g., '192.168.1')
+    final parts = host.split('.');
+    return parts.length == 3 && parts.every(_isValidOctet);
+  }
+
+  /// Check if a string is a valid IP octet
+  static bool _isValidOctet(String part) {
+    final num = int.tryParse(part);
+    return num != null && num >= 0 && num <= 255;
   }
 }

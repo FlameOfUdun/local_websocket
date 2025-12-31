@@ -1,19 +1,19 @@
 part of '../source.dart';
 
-/// A WebSocket server that supports client management and authentication.
-final class Server {
+/// A WebSocket server that supports client management and authentication
+class Server {
   final bool _echo;
   final Map<String, dynamic> _details;
-  final RequestAuthenticationDelegate? _requestAuthenticatorDelegate;
+  final RequestAuthenticationDelegate? _requestAuthenticationDelegate;
   final ClientValidationDelegate? _clientValidationDelegate;
   final ClientConnectionDelegate? _clientConnectionDelegate;
   final MessageValidationDelegate? _messageValidationDelegate;
   final Set<Client> _clients = {};
   final String _version = '1.0.0';
 
-  final _connectionBroadcast = StreamController<bool>.broadcast();
-  final _clientsBroadcast = StreamController<Set<Client>>.broadcast();
-  final _messageBroadcast = StreamController<dynamic>.broadcast();
+  final _connectionController = StreamController<bool>.broadcast();
+  final _clientsController = StreamController<Set<Client>>.broadcast();
+  final _messageController = StreamController<dynamic>.broadcast();
 
   HttpServer? _server;
 
@@ -24,29 +24,29 @@ final class Server {
     ClientValidationDelegate? clientValidationDelegate,
     ClientConnectionDelegate? clientConnectionDelegate,
     MessageValidationDelegate? messageValidationDelegate,
-  })  : _details = details,
+  })  : _details = Map.from(details),
         _echo = echo,
-        _requestAuthenticatorDelegate = requestAuthenticationDelegate,
+        _requestAuthenticationDelegate = requestAuthenticationDelegate,
         _clientValidationDelegate = clientValidationDelegate,
         _clientConnectionDelegate = clientConnectionDelegate,
         _messageValidationDelegate = messageValidationDelegate;
 
-  /// The set of currently connected clients.
+  /// The set of currently connected clients
   Set<Client> get clients => Set.unmodifiable(_clients);
 
-  /// Stream of currently connected clients.
-  Stream<Set<Client>> get clientsStream => _clientsBroadcast.stream;
+  /// Stream of currently connected clients
+  Stream<Set<Client>> get clientsStream => _clientsController.stream;
 
-  /// Stream of connection status changes.
-  Stream<bool> get connectionStream => _connectionBroadcast.stream;
+  /// Stream of connection status changes
+  Stream<bool> get connectionStream => _connectionController.stream;
 
-  /// Stream of messages received by the server.
-  Stream<dynamic> get messageStream => _messageBroadcast.stream;
+  /// Stream of messages received by the server
+  Stream<dynamic> get messageStream => _messageController.stream;
 
-  /// Indicates whether the server is currently running.
+  /// Indicates whether the server is currently running
   bool get isConnected => _server != null;
 
-  /// The address of the running server.
+  /// The address of the running server
   Uri get address {
     if (_server == null) {
       throw StateError('Server is not running!');
@@ -54,130 +54,144 @@ final class Server {
     return Uri.parse('http://${_server!.address.host}:${_server!.port}');
   }
 
-  /// Starts the server on the given [host] and [port].
+  /// Starts the server on the given [host] and [port]
   Future<void> start(
     String host, {
     int port = 8080,
   }) async {
     if (_server != null) {
       throw StateError(
-          'Server is already running on ${_server!.address.host}:${_server!.port}');
+        'Server is already running on ${_server!.address.host}:${_server!.port}',
+      );
     }
 
-    print('Starting server on $host:$port');
+    _server = await HttpServer.bind(host, port);
 
-    final router = Router();
-    router.get("/", _onInfo);
-    router.mount("/ws", _onUpgrade);
+    _server!.listen((HttpRequest request) async {
+      if (request.uri.path == '/ws') {
+        await _handleWebSocketUpgrade(request);
+      } else {
+        await _handleHttpRequest(request);
+      }
+    });
 
-    _server = await serve(router.call, host, port);
-
-    print('Server started');
-
-    _connectionBroadcast.add(true);
+    _connectionController.add(true);
   }
 
-  /// Stops the server and disconnects all clients.
+  /// Stops the server and disconnects all clients
   Future<void> stop() async {
     if (_server == null) {
       throw StateError('Server is not running!');
     }
 
-    print('Stopping server on ${_server!.address.host}:${_server!.port}');
-
     for (final client in Set.unmodifiable(_clients)) {
-      client.disconnect().ignore();
+      await client.disconnect();
     }
     _clients.clear();
 
     await _server!.close();
     _server = null;
 
-    print('Server stopped');
-
-    _clientsBroadcast.add(Set.unmodifiable(_clients));
-    _connectionBroadcast.add(false);
+    _clientsController.add(Set.unmodifiable(_clients));
+    _connectionController.add(false);
   }
 
-  Future<Response> _onInfo(Request request) async {
-    return Response.ok(
-      jsonEncode(_details),
-      headers: {
-        'Content-Type': 'application/json',
-        'Server': 'local-websocket/$_version',
+  /// Handle HTTP info endpoint
+  Future<void> _handleHttpRequest(HttpRequest request) async {
+    final response = request.response
+      ..statusCode = 200
+      ..headers.contentType = ContentType.json
+      ..headers.add('Server', 'local-websocket/$_version')
+      ..write(jsonEncode(_details));
+    await response.close();
+  }
+
+  /// Handle WebSocket upgrade request
+  Future<void> _handleWebSocketUpgrade(HttpRequest request) async {
+    // Authenticate request if delegate is provided
+    if (_requestAuthenticationDelegate != null) {
+      final authResult = await _requestAuthenticationDelegate.authenticateRequest(request);
+
+      if (!authResult.isSuccess) {
+        final response = request.response
+          ..statusCode = authResult.statusCode ?? 403
+          ..headers.contentType = ContentType.json
+          ..write(jsonEncode({
+            'error': {
+              'code': 'AUTHENTICATION_FAILED',
+              'message': authResult.reason ?? 'Authentication failed',
+              'statusCode': authResult.statusCode ?? 403,
+            }
+          }));
+        await response.close();
+
+        return;
+      }
+    }
+
+    // Upgrade to WebSocket
+    final socket = await WebSocketTransformer.upgrade(request);
+
+    // Create client from query parameters
+    final queryParams = Map<String, String>.from(
+      request.uri.queryParameters.map((k, v) => MapEntry(k, v.toString())),
+    );
+    final client = Client.withSocket(socket: socket, details: queryParams);
+
+    // Validate client if delegate is provided
+    if (_clientValidationDelegate != null) {
+      final isValid = await _clientValidationDelegate.validateClient(client, request);
+      if (!isValid) {
+        await socket.close(3000, 'Client validation failed');
+        return;
+      }
+    }
+
+    // Add client to set
+    _clients.add(client);
+    _clientsController.add(Set.unmodifiable(_clients));
+
+    // Notify connection delegate
+    await _clientConnectionDelegate?.onClientConnected(client);
+
+    // Listen for messages from this client
+    socket.listen(
+      (message) async {
+        // Validate message if delegate is provided
+        if (_messageValidationDelegate != null) {
+          final isValid = await _messageValidationDelegate.validateMessage(client, message);
+          if (!isValid) {
+            return;
+          }
+        }
+
+        // Broadcast or echo message
+        for (final otherClient in _clients) {
+          if (_echo) {
+            otherClient.send(message);
+          } else {
+            if (otherClient.uid != client.uid) {
+              otherClient.send(message);
+            }
+          }
+        }
+
+        _messageController.add(message);
+      },
+      onDone: () async {
+        _clients.remove(client);
+        _clientsController.add(Set.unmodifiable(_clients));
+        await _clientConnectionDelegate?.onClientDisconnected(client);
+      },
+      onError: (error) async {
+        _clients.remove(client);
+        _clientsController.add(Set.unmodifiable(_clients));
+        await _clientConnectionDelegate?.onClientDisconnected(client);
       },
     );
   }
 
-  Future<Response> _onUpgrade(Request request) async {
-    final requestAuthenticationResult =
-        await _requestAuthenticatorDelegate?.authenticateRequest(request);
-    if (requestAuthenticationResult != null &&
-        !requestAuthenticationResult.isSuccess) {
-      return Response(
-        requestAuthenticationResult.statusCode ?? 403,
-        body: requestAuthenticationResult.reason ?? 'Authentication failed',
-      );
-    }
-
-    final handler = webSocketHandler((channel, _) async {
-      final client = Client.withChannel(
-        channel: channel,
-        details: request.url.queryParameters,
-      );
-
-      final clientValidationResult =
-          await _clientValidationDelegate?.validateClient(client, request);
-      if (clientValidationResult != null && !clientValidationResult) {
-        await channel.sink.close(3000, 'Client validation failed');
-        return;
-      }
-
-      _clients.add(client);
-      _clientsBroadcast.add(Set.unmodifiable(_clients));
-
-      Future(() async {
-        await _clientConnectionDelegate?.onClientConnected(client);
-      }).ignore();
-
-      channel.stream.listen(
-        (message) async {
-          try {
-            final messageValidationResult = await _messageValidationDelegate
-                ?.validateMessage(client, message);
-            if (messageValidationResult != null && !messageValidationResult) {
-              return;
-            }
-          } catch (e) {
-            return;
-          }
-
-          for (final item in _clients) {
-            if (_echo) {
-              item.send(message);
-            } else {
-              if (item.uid != client.uid) {
-                item.send(message);
-              }
-            }
-          }
-
-          _messageBroadcast.add(message);
-        },
-        onDone: () async {
-          _clients.remove(client);
-          _clientsBroadcast.add(Set.unmodifiable(_clients));
-
-          Future(() async {
-            await _clientConnectionDelegate?.onClientDisconnected(client);
-          }).ignore();
-        },
-      );
-    });
-
-    return handler.call(request);
-  }
-
+  /// Send a message to all connected clients
   void send(dynamic message) {
     if (_server == null) {
       throw StateError('Server is not running!');
@@ -188,7 +202,17 @@ final class Server {
     }
 
     if (_echo) {
-      _messageBroadcast.add(message);
+      _messageController.add(message);
     }
+  }
+
+  /// Dispose resources
+  Future<void> dispose() async {
+    if (_server != null) {
+      await stop();
+    }
+    await _connectionController.close();
+    await _clientsController.close();
+    await _messageController.close();
   }
 }

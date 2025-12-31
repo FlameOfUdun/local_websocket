@@ -4,7 +4,7 @@
 [![Flutter](https://img.shields.io/badge/Flutter-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-0175C2?logo=dart&logoColor=white)](https://dart.dev)
 
-A pure Dart library for local network WebSocket communication with automatic server discovery and scanning capabilities. Build real-time communication between devices on the same network with minimal setup.
+A **zero-dependency** pure Dart library for local network WebSocket communication with automatic server discovery and scanning capabilities. Build real-time communication between devices on the same network with minimal setup—no external packages required.
 
 ---
 
@@ -35,15 +35,16 @@ A pure Dart library for local network WebSocket communication with automatic ser
 - 🚀 **Easy Server Setup** - Create WebSocket servers with minimal configuration
 - 📱 **Client Connection Management** - Simple client connection and real-time messaging
 - 🌐 **Cross-Platform** - Works on all Dart platforms (Flutter, CLI, Desktop, Server)
-- 🔧 **Pure Dart** - No platform-specific dependencies, works everywhere Dart runs
+- 🔧 **Zero Dependencies** - Pure Dart implementation using only dart:io, dart:async, and dart:convert
 - 💬 **Broadcast & Echo Modes** - Choose between broadcasting to all clients or echoing back to sender
 - 🏷️ **Metadata Support** - Attach custom details to servers and clients
 - 📡 **Real-time Streaming** - Reactive streams for messages, connections, and client updates
-- 🆔 **Unique Client IDs** - Automatic UUID generation for each client
+- 🆔 **Unique Client IDs** - Automatic unique ID generation for each client
 - 🛡️ **Type-Safe** - Fully typed API with Dart's null safety
-- 🔐 **Flexible Authentication** - Extensible delegate-based authentication system
+- 🔐 **Flexible Authentication** - Extensible delegate-based authentication system (token, header, IP-based)
 - ✅ **Request & Message Validation** - Validate requests, clients, and messages with custom delegates
 - 🔌 **Connection Lifecycle Hooks** - Handle client connection and disconnection events
+- ⚡ **Lightweight** - No external dependencies means smaller package size and faster installation
 
 ---
 
@@ -53,7 +54,7 @@ Add `local_websocket` to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  local_websocket: ^0.0.1
+  local_websocket: ^0.0.2
 ```
 
 Then run:
@@ -170,7 +171,7 @@ The **Server** is the central hub that accepts WebSocket connections and manages
 
 ### Client
 
-The **Client** connects to a server via WebSocket and can send/receive messages in real-time. Each client has a unique UUID and can include custom metadata (username, device type, etc.) that gets passed to the server.
+The **Client** connects to a server via WebSocket and can send/receive messages in real-time. Each client has a unique ID (timestamp-based) and can include custom metadata (username, device type, etc.) that gets passed to the server as query parameters.
 
 ### Scanner
 
@@ -295,14 +296,14 @@ await client.connect('ws://127.0.0.1:8080/ws');
 
 The client details are automatically added as query parameters:
 
-```
+```txt
 ws://127.0.0.1:8080/ws?username=Alice&deviceType=iOS&appVersion=1.0.0
 ```
 
 #### Client Properties
 
 ```dart
-client.uid;              // String: Unique UUID for this client
+client.uid;              // String: Unique ID for this client (timestamp-based)
 client.details;          // Map<String, String>: Client metadata (unmodifiable)
 client.isConnected;      // bool: Is client connected?
 client.messageStream;    // Stream<dynamic>: Incoming messages
@@ -441,7 +442,7 @@ Authenticates incoming HTTP requests **before** the WebSocket upgrade occurs. Th
 
 ```dart
 abstract interface class RequestAuthenticationDelegate {
-  FutureOr<RequestAuthenticationResult> authenticateRequest(Request request);
+  FutureOr<RequestAuthenticationResult> authenticateRequest(HttpRequest request);
 }
 ```
 
@@ -531,7 +532,7 @@ class CustomAuthenticator implements RequestAuthenticationDelegate {
   const CustomAuthenticator({required this.apiKey});
   
   @override
-  Future<RequestAuthenticationResult> authenticateRequest(Request request) async {
+  Future<RequestAuthenticationResult> authenticateRequest(HttpRequest request) async {
     final providedKey = request.url.queryParameters['api_key'];
     
     if (providedKey == null) {
@@ -597,7 +598,7 @@ Validates clients **after** the WebSocket connection is established but **before
 
 ```dart
 abstract class ClientValidationDelegate {
-  FutureOr<bool> validateClient(Client client, Request request);
+  FutureOr<bool> validateClient(Client client, HttpRequest request);
 }
 ```
 
@@ -618,7 +619,7 @@ class MaxClientsValidator implements ClientValidationDelegate {
   MaxClientsValidator({required this.maxClients, required this.server});
   
   @override
-  Future<bool> validateClient(Client client, Request request) async {
+  Future<bool> validateClient(Client client, HttpRequest request) async {
     if (server.clients.length >= maxClients) {
       print('Server full: ${server.clients.length}/$maxClients');
       return false;
@@ -640,7 +641,7 @@ server.clientValidationDelegate = MaxClientsValidator(
 ```dart
 class UsernameValidator implements ClientValidationDelegate {
   @override
-  Future<bool> validateClient(Client client, Request request) async {
+  Future<bool> validateClient(Client client, HttpRequest request) async {
     final username = client.details['username'];
     
     if (username == null || username.isEmpty) {
@@ -1147,6 +1148,22 @@ class GameClient {
 
 ## Architecture
 
+### Zero-Dependency Implementation
+
+This package is built using **only Dart SDK libraries** with zero external dependencies:
+
+- **`dart:io`** - HTTP server, WebSocket protocol, network operations
+- **`dart:async`** - Streams, futures, and async operations  
+- **`dart:convert`** - JSON encoding/decoding
+
+**Benefits:**
+
+- ✅ Smaller package size (~50KB vs typical 2MB+ with dependencies)
+- ✅ Faster installation and pub get
+- ✅ No dependency conflicts
+- ✅ Direct control over WebSocket implementation
+- ✅ Works everywhere Dart runs without platform-specific code
+
 ### How It Works
 
 ```
@@ -1435,19 +1452,93 @@ await Scanner.scan('10.0.0');         // Scans 10.0.0.*
 
 ## Error Handling
 
+The package uses a structured error model with `WebSocketError` for consistent error handling.
+
+### WebSocketError
+
+All connection and authentication errors are wrapped in a `WebSocketError` that provides:
+
+- **`code`**: Error category (`'AUTHENTICATION_FAILED'`, `'CONNECTION_FAILED'`, `'VALIDATION_FAILED'`)
+- **`message`**: Human-readable error description
+- **`statusCode`**: HTTP status code when applicable (401, 403, etc.)
+- **`details`**: Additional error metadata
+- **`originalError`**: Underlying exception for debugging
+
+### Client Connection Errors
+
+```dart
+try {
+  final client = Client(details: {'token': 'secret123'});
+  await client.connect('ws://127.0.0.1:8080/ws');
+  
+} on WebSocketError catch (e) {
+  if (e.code == 'AUTHENTICATION_FAILED') {
+    if (e.statusCode == 401) {
+      print('Authentication required: ${e.message}');
+      // Prompt user for credentials
+    } else if (e.statusCode == 403) {
+      print('Invalid credentials: ${e.message}');
+      // Show error message to user
+    }
+  } else if (e.code == 'VALIDATION_FAILED') {
+    print('Connection rejected: ${e.message}');
+    // Handle validation failure (e.g., banned client)
+  } else if (e.code == 'CONNECTION_FAILED') {
+    print('Connection failed: ${e.message}');
+    // Check network, server address, etc.
+  }
+} catch (e) {
+  print('Unexpected error: $e');
+}
+```
+
+### Server Errors
+
 ```dart
 try {
   final server = Server();
-  await server.start(host: 'localhost');
-  
-  final client = Client();
-  await client.connect('ws://localhost:8080/ws');
+  await server.start('0.0.0.0', port: 8080);
   
 } on StateError catch (e) {
-  print('State error: $e'); // Server already running, client already connected, etc.
-} on ArgumentError catch (e) {
-  print('Invalid argument: $e'); // Invalid host format, etc.
+  print('State error: $e'); 
+  // Server already running
+  
+} on SocketException catch (e) {
+  print('Socket error: $e'); 
+  // Port already in use, invalid host, etc.
+  
 } catch (e) {
-  print('Network error: $e'); // Connection failed, timeout, etc.
+  print('Network error: $e');
 }
+```
+
+### Common Error Scenarios
+
+#### Authentication Failures
+
+```dart
+// HTTP 401 - Missing credentials
+WebSocketError: [AUTHENTICATION_FAILED] Authentication required (HTTP 401)
+
+// HTTP 403 - Invalid credentials
+WebSocketError: [AUTHENTICATION_FAILED] Invalid token (HTTP 403)
+```
+
+#### Connection Failures
+
+```dart
+// Network unreachable
+WebSocketError: [CONNECTION_FAILED] Connection failed: Network unreachable
+
+// Server not responding
+WebSocketError: [CONNECTION_FAILED] Connection timeout
+```
+
+#### Validation Failures
+
+```dart
+// Client validation failed
+WebSocketError: [VALIDATION_FAILED] Maximum clients reached
+
+// Message validation failed (silently dropped by server)
 ```
