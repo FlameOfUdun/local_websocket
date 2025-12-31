@@ -1,11 +1,13 @@
-import 'package:dio/dio.dart';
+part of '../source.dart';
 
-import '../models/discovered_server.dart';
-
+/// A utility class for scanning a local network for available WebSocket servers.
 final class Scanner {
+  /// Scans the local network for WebSocket servers of the specified [type] and [port].
+  /// By default, it scans for servers of type 'local-websocket' on port 8080.
+  /// The scan runs at the specified [interval].
   static Stream<List<DiscoveredServer>> scan(
     String host, {
-    String type = 'flutter-local-websocket',
+    String type = 'local-websocket',
     int port = 8080,
     Duration interval = const Duration(seconds: 3),
   }) async* {
@@ -51,7 +53,7 @@ final class Scanner {
     required int port,
     required String type,
   }) async {
-    final client = Dio(BaseOptions(
+    final client = dio.Dio(dio.BaseOptions(
       receiveTimeout: const Duration(seconds: 1),
       connectTimeout: const Duration(seconds: 1),
       sendTimeout: const Duration(seconds: 1),

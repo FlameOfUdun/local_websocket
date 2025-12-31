@@ -1,6 +1,6 @@
 import 'package:test/test.dart';
 
-import 'package:flutter_local_websocket/flutter_local_websocket.dart';
+import 'package:local_websocket/local_websocket.dart';
 
 void main() {
   late Server server;
@@ -35,12 +35,14 @@ void main() {
       expect(server.isConnected, isFalse);
     });
 
-    test('should throw error when trying to start an already running server', () async {
+    test('should throw error when trying to start an already running server',
+        () async {
       await server.start('127.0.0.1');
       expect(() => server.start('127.0.0.1'), throwsStateError);
     });
 
-    test('should throw error when trying to stop a server that is not running', () async {
+    test('should throw error when trying to stop a server that is not running',
+        () async {
       expect(() => server.stop(), throwsStateError);
     });
 
@@ -55,7 +57,8 @@ void main() {
       await server.start('127.0.0.1');
       expect(Scanner.scan("127.0.0.1"), isA<Stream<List<DiscoveredServer>>>());
       expect(await Scanner.scan("127.0.0.1").first, isNotEmpty);
-      expect((await Scanner.scan("127.0.0.1").first).first.path, equals('ws://127.0.0.1:8080/ws'));
+      expect((await Scanner.scan("127.0.0.1").first).first.path,
+          equals('ws://127.0.0.1:8080/ws'));
     });
 
     test('should connect/disconnect client', () async {
@@ -64,10 +67,10 @@ void main() {
 
       await client.connect('ws://127.0.0.1:8080/ws');
       expect(client.isConnected, isTrue);
-      
+
       await Future.delayed(Duration(seconds: 1));
       expect(server.clients, isNotEmpty);
-      
+
       await client.disconnect();
       await Future.delayed(Duration(seconds: 1));
       expect(client.isConnected, isFalse);
@@ -80,10 +83,10 @@ void main() {
 
       await client.connect('ws://127.0.0.1:8080/ws');
       expect(client.isConnected, isTrue);
-      
+
       await Future.delayed(Duration(seconds: 1));
       expect(server.clients, isNotEmpty);
-      
+
       await server.stop();
       await Future.delayed(Duration(seconds: 1));
       expect(client.isConnected, isFalse);
@@ -97,7 +100,7 @@ void main() {
       });
 
       await Future.delayed(Duration(seconds: 1));
-      
+
       await client.connect('ws://127.0.0.1:8080/ws');
       client.messageStream.listen((message) {
         expect(message, 'Hello from Server');
@@ -106,7 +109,7 @@ void main() {
       await Future.delayed(Duration(seconds: 1));
 
       client.send('Hello from Client');
-      
+
       await Future.delayed(Duration(seconds: 1));
 
       server.send('Hello from Server');

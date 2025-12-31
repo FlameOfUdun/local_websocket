@@ -1,5 +1,11 @@
+part of '../source.dart';
+
+/// Represents a WebSocket server discovered on the network.
 final class DiscoveredServer {
+  /// The path to connect to the discovered server.
   final String path;
+
+  /// Additional details about the discovered server.
   final Map<String, dynamic> details;
 
   const DiscoveredServer({

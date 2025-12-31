@@ -1,6 +1,7 @@
-name: flutter_local_websocket
-description: Flutter plugin for local websocket communication.
+name: local_websocket
+description: A pure Dart library for local network WebSocket communication with automatic server discovery and scanning capabilities.
 version: 0.0.1
+repository: https://github.com/FlameOfUdun/local_websocket
 
 environment:
   sdk: ^3.6.2

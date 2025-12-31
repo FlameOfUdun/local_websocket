@@ -1,4 +1,4 @@
-import 'package:flutter_local_websocket/flutter_local_websocket.dart';
+import 'package:local_websocket/local_websocket.dart';
 
 void main(List<String> args) async {
   final server = Server(
