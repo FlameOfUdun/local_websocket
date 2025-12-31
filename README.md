@@ -4,7 +4,11 @@
 [![Flutter](https://img.shields.io/badge/Flutter-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-0175C2?logo=dart&logoColor=white)](https://dart.dev)
 
-A **zero-dependency** pure Dart library for local network WebSocket communication with automatic server discovery and scanning capabilities. Build real-time communication between devices on the same network with minimal setup—no external packages required.
+`local_websocket` is a local-first WebSocket library for Flutter and Dart that enables automatic device discovery and real-time communication on a local network (LAN) without cloud servers, static IPs, or manual configuration. It is designed for offline-friendly, zero-config applications where devices need to find and communicate with each other over Wi-Fi or private networks.
+
+This package is useful for Flutter and Dart developers building local network applications such as mobile-to-desktop companion apps, local multiplayer games, classroom or lab tools, kiosk systems, medical or industrial devices, and offline or air-gapped environments. If all participating devices are connected to the same local network, `local_websocket` provides a simple and lightweight solution.
+
+The package combines three core capabilities in a single API: automatic local network discovery, a built-in WebSocket server and client, and real-time messaging using Dart streams. Clients can discover available servers on the local subnet, connect without hardcoded IP addresses, exchange messages in real time, and attach metadata such as device name, role, or user information. The library is written in pure Dart, has zero external dependencies, and works across Flutter and Dart targets including mobile and desktop platforms.
 
 ---
 
@@ -17,6 +21,7 @@ A **zero-dependency** pure Dart library for local network WebSocket communicatio
 - [Detailed Guide](#detailed-guide)
   - [Server](#server)
   - [Client](#client)
+    - [Auto-Reconnect](#auto-reconnect)
   - [Scanner](#scanner)
   - [Delegates](#delegates)
 - [Use Cases](#use-cases)
@@ -34,6 +39,7 @@ A **zero-dependency** pure Dart library for local network WebSocket communicatio
 - 🔍 **Automatic Server Discovery** - Scan local networks to find WebSocket servers automatically
 - 🚀 **Easy Server Setup** - Create WebSocket servers with minimal configuration
 - 📱 **Client Connection Management** - Simple client connection and real-time messaging
+- 🔄 **Auto-Reconnect** - Automatic reconnection with exponential/linear backoff strategies
 - 🌐 **Cross-Platform** - Works on all Dart platforms (Flutter, CLI, Desktop, Server)
 - 🔧 **Zero Dependencies** - Pure Dart implementation using only dart:io, dart:async, and dart:convert
 - 💬 **Broadcast & Echo Modes** - Choose between broadcasting to all clients or echoing back to sender
@@ -352,6 +358,114 @@ client.connectionStream.listen((isConnected) {
 
 ```dart
 await client.disconnect();
+```
+
+#### Auto-Reconnect
+
+The client supports automatic reconnection when the connection is lost unexpectedly. Enable it by providing a `ClientReconectionDelegate`:
+
+```dart
+final client = Client(
+  details: {'username': 'Alice'},
+  clientReconnectionDelegate: ExponentialBackoffReconnect(
+    maxAttempts: 5,
+    initialDelay: Duration(seconds: 1),
+    maxDelay: Duration(seconds: 30),
+    multiplier: 2.0,
+  ),
+);
+
+await client.connect('ws://127.0.0.1:8080/ws');
+// If connection is lost, client will automatically try to reconnect
+// with exponential backoff: 1s, 2s, 4s, 8s, 16s (capped at 30s)
+```
+
+**Built-in Reconnection Strategies:**
+
+1. **ExponentialBackoffReconnect** - Exponentially increasing delays (1s, 2s, 4s, 8s...)
+   ```dart
+   ExponentialBackoffReconnect(
+     maxAttempts: 5,              // Stop after 5 failed attempts
+     initialDelay: Duration(seconds: 1),
+     maxDelay: Duration(seconds: 30),
+     multiplier: 2.0,
+   )
+   ```
+
+2. **LinearBackoffReconnect** - Linearly increasing delays (2s, 4s, 6s, 8s...)
+   ```dart
+   LinearBackoffReconnect(
+     maxAttempts: 10,             // Stop after 10 failed attempts
+     interval: Duration(seconds: 2),
+   )
+   ```
+
+3. **InfiniteReconnect** - Never gives up, keeps trying forever
+   ```dart
+   InfiniteReconnect(
+     interval: Duration(seconds: 5),  // Try every 5 seconds
+   )
+   ```
+
+**Connection Status Tracking:**
+
+Monitor the connection status to show UI feedback:
+
+```dart
+client.connectionStream.listen((status) {
+  switch (status) {
+    case ClientConnectionStatus.connected:
+      print('✅ Connected');
+      break;
+    case ClientConnectionStatus.connecting:
+      print('⏳ Connecting... (auto-reconnect in progress)');
+      break;
+    case ClientConnectionStatus.disconnected:
+      print('❌ Disconnected');
+      break;
+  }
+});
+
+// Or check current status
+if (client.connectionStatus == ClientConnectionStatus.connected) {
+  client.send('Hello!');
+}
+```
+
+**Custom Reconnection Logic:**
+
+Create your own reconnection strategy:
+
+```dart
+class SmartReconnect implements ClientReconectionDelegate {
+  @override
+  Future<bool> shouldReconnect(int attemptNumber, Duration timeSinceLastConnect) async {
+    // Only reconnect during business hours
+    final hour = DateTime.now().hour;
+    if (hour < 9 || hour > 17) return false;
+    
+    return attemptNumber < 3;
+  }
+  
+  @override
+  Future<Duration> getReconnectDelay(int attemptNumber) async {
+    return Duration(seconds: 5);
+  }
+  
+  @override
+  void onReconnected(int attemptNumber) {
+    print('Successfully reconnected!');
+  }
+  
+  @override
+  void onReconnectFailed(int totalAttempts) {
+    print('Failed to reconnect after $totalAttempts attempts');
+  }
+}
+
+final client = Client(
+  clientReconnectionDelegate: SmartReconnect(),
+);
 ```
 
 ---
@@ -1026,6 +1140,35 @@ final receiver = Client();
 receiver.messageStream.listen((chunk) {
   // Receive and reconstruct file
 });
+```
+
+### 6. **Resilient Mobile App**
+
+Build a mobile app that maintains connection despite network issues.
+
+```dart
+// Mobile client with auto-reconnect
+final client = Client(
+  details: {'userId': '12345', 'deviceType': 'mobile'},
+  clientReconnectionDelegate: ExponentialBackoffReconnect(
+    maxAttempts: 10,
+    initialDelay: Duration(seconds: 1),
+    maxDelay: Duration(seconds: 60),
+  ),
+);
+
+await client.connect('ws://192.168.1.100:8080/ws');
+
+// Monitor connection status for UI feedback
+client.connectionStream.listen((status) {
+  if (status == ClientConnectionStatus.connecting) {
+    showSnackBar('Reconnecting...');
+  } else if (status == ClientConnectionStatus.connected) {
+    showSnackBar('Connected!');
+  }
+});
+
+// Client will automatically reconnect if WiFi drops or server restarts
 ```
 
 ---

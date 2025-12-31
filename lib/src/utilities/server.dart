@@ -110,7 +110,8 @@ class Server {
   Future<void> _handleWebSocketUpgrade(HttpRequest request) async {
     // Authenticate request if delegate is provided
     if (_requestAuthenticationDelegate != null) {
-      final authResult = await _requestAuthenticationDelegate.authenticateRequest(request);
+      final authResult =
+          await _requestAuthenticationDelegate.authenticateRequest(request);
 
       if (!authResult.isSuccess) {
         final response = request.response
@@ -136,11 +137,12 @@ class Server {
     final queryParams = Map<String, String>.from(
       request.uri.queryParameters.map((k, v) => MapEntry(k, v.toString())),
     );
-    final client = Client.withSocket(socket: socket, details: queryParams);
+    final client = Client.connected(socket: socket, details: queryParams);
 
     // Validate client if delegate is provided
     if (_clientValidationDelegate != null) {
-      final isValid = await _clientValidationDelegate.validateClient(client, request);
+      final isValid =
+          await _clientValidationDelegate.validateClient(client, request);
       if (!isValid) {
         await socket.close(3000, 'Client validation failed');
         return;
@@ -159,7 +161,8 @@ class Server {
       (message) async {
         // Validate message if delegate is provided
         if (_messageValidationDelegate != null) {
-          final isValid = await _messageValidationDelegate.validateMessage(client, message);
+          final isValid =
+              await _messageValidationDelegate.validateMessage(client, message);
           if (!isValid) {
             return;
           }
@@ -192,9 +195,18 @@ class Server {
   }
 
   /// Send a message to all connected clients
+  ///
+  /// Throws a [StateError] if the server is not running.
+  ///
+  /// The [message] must be either a [String], [List<int>], or [Uint8List]
   void send(dynamic message) {
     if (_server == null) {
       throw StateError('Server is not running!');
+    }
+
+    if (message is! String && message is! List<int> && message is! Uint8List) {
+      throw ArgumentError.value(message, 'message',
+          'Message must be a String or List<int> or Uint8List');
     }
 
     for (final client in _clients) {

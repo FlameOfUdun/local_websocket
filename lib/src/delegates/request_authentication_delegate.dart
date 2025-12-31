@@ -1,13 +1,14 @@
 part of '../source.dart';
 
 /// Abstract class that defines the contract for authenticating incoming requests
-abstract class RequestAuthenticationDelegate {
+abstract interface class RequestAuthenticationDelegate {
   /// Authenticates the given [request] and returns a [RequestAuthenticationResult]
-  FutureOr<RequestAuthenticationResult> authenticateRequest(HttpRequest request);
+  FutureOr<RequestAuthenticationResult> authenticateRequest(
+      HttpRequest request);
 }
 
 /// Simple token-based request authenticator
-class RequestTokenAuthenticator implements RequestAuthenticationDelegate {
+final class RequestTokenAuthenticator implements RequestAuthenticationDelegate {
   /// The set of valid tokens
   final Set<String> validTokens;
 
@@ -20,7 +21,8 @@ class RequestTokenAuthenticator implements RequestAuthenticationDelegate {
   });
 
   @override
-  Future<RequestAuthenticationResult> authenticateRequest(HttpRequest request) async {
+  Future<RequestAuthenticationResult> authenticateRequest(
+      HttpRequest request) async {
     final token = request.uri.queryParameters[parameterName];
 
     if (token == null || token.isEmpty) {
@@ -44,7 +46,8 @@ class RequestTokenAuthenticator implements RequestAuthenticationDelegate {
 }
 
 /// Header-based request authenticator
-class RequestHeaderAuthenticator implements RequestAuthenticationDelegate {
+final class RequestHeaderAuthenticator
+    implements RequestAuthenticationDelegate {
   /// The name of the header to validate
   final String headerName;
 
@@ -61,7 +64,8 @@ class RequestHeaderAuthenticator implements RequestAuthenticationDelegate {
   });
 
   @override
-  Future<RequestAuthenticationResult> authenticateRequest(HttpRequest request) async {
+  Future<RequestAuthenticationResult> authenticateRequest(
+      HttpRequest request) async {
     final headerValue = request.headers.value(headerName);
 
     if (headerValue == null || headerValue.isEmpty) {
@@ -71,7 +75,9 @@ class RequestHeaderAuthenticator implements RequestAuthenticationDelegate {
       );
     }
 
-    final isValid = caseSensitive ? validValues.contains(headerValue) : validValues.any((v) => v.toLowerCase() == headerValue.toLowerCase());
+    final isValid = caseSensitive
+        ? validValues.contains(headerValue)
+        : validValues.any((v) => v.toLowerCase() == headerValue.toLowerCase());
 
     if (!isValid) {
       return RequestAuthenticationResult.failure(
@@ -87,7 +93,7 @@ class RequestHeaderAuthenticator implements RequestAuthenticationDelegate {
 }
 
 /// IP-based request authenticator
-class RequestIPAuthenticator implements RequestAuthenticationDelegate {
+final class RequestIPAuthenticator implements RequestAuthenticationDelegate {
   /// The set of allowed IP addresses
   final Set<String> allowedIPs;
 
@@ -96,7 +102,8 @@ class RequestIPAuthenticator implements RequestAuthenticationDelegate {
   });
 
   @override
-  Future<RequestAuthenticationResult> authenticateRequest(HttpRequest request) async {
+  Future<RequestAuthenticationResult> authenticateRequest(
+      HttpRequest request) async {
     final clientIP = request.connectionInfo?.remoteAddress.address;
 
     if (clientIP == null) {

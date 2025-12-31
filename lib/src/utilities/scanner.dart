@@ -3,11 +3,11 @@ part of '../source.dart';
 /// Scanner for discovering WebSocket servers on the network
 class Scanner {
   /// Scan for servers on the given [host] and [port]
-  /// 
+  ///
   /// The [host] can be:
   /// - A specific host: 'localhost', '192.168.1.100'
   /// - A subnet: '192.168.1' (will scan .1 to .254)
-  /// 
+  ///
   /// Returns a Stream that emits lists of discovered servers every [interval]
   static Stream<List<DiscoveredServer>> scan(
     String host, {

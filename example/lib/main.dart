@@ -38,13 +38,12 @@ class SimpleTokenAuthenticator implements RequestAuthenticationDelegate {
   final String requiredToken;
   final void Function(String)? onLog;
 
-  const SimpleTokenAuthenticator({
-    required this.requiredToken,
-    this.onLog,
-  });
+  const SimpleTokenAuthenticator({required this.requiredToken, this.onLog});
 
   @override
-  Future<RequestAuthenticationResult> authenticateRequest(HttpRequest request) async {
+  Future<RequestAuthenticationResult> authenticateRequest(
+    HttpRequest request,
+  ) async {
     final token = request.uri.queryParameters['token'];
 
     if (token == null || token.isEmpty) {
@@ -64,9 +63,7 @@ class SimpleTokenAuthenticator implements RequestAuthenticationDelegate {
     }
 
     onLog?.call('Authentication successful for token: $token');
-    return RequestAuthenticationResult.success(
-      metadata: {'token': token},
-    );
+    return RequestAuthenticationResult.success(metadata: {'token': token});
   }
 }
 
@@ -102,10 +99,7 @@ class MessageValidator implements MessageValidationDelegate {
   final int maxLength;
   final void Function(String)? onLog;
 
-  const MessageValidator({
-    this.maxLength = 1000,
-    this.onLog,
-  });
+  const MessageValidator({this.maxLength = 1000, this.onLog});
 
   @override
   Future<bool> validateMessage(Client client, dynamic message) async {
@@ -122,7 +116,9 @@ class MessageValidator implements MessageValidationDelegate {
     }
 
     if (messageStr.length > maxLength) {
-      onLog?.call('Message validation failed: message too long (${messageStr.length} > $maxLength)');
+      onLog?.call(
+        'Message validation failed: message too long (${messageStr.length} > $maxLength)',
+      );
       return false;
     }
 
@@ -140,7 +136,10 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Local WebSocket Demo',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple), useMaterial3: true),
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        useMaterial3: true,
+      ),
       home: const HomePage(),
     );
   }
@@ -159,8 +158,14 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Local WebSocket Example'), backgroundColor: Theme.of(context).colorScheme.inversePrimary),
-      body: IndexedStack(index: _selectedIndex, children: [const ServerPage(), const ClientPage(), const ScannerPage()]),
+      appBar: AppBar(
+        title: const Text('Local WebSocket Example'),
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+      ),
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: [const ServerPage(), const ClientPage(), const ScannerPage()],
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
         onDestinationSelected: (int index) {
@@ -170,7 +175,10 @@ class _HomePageState extends State<HomePage> {
         },
         destinations: const [
           NavigationDestination(icon: Icon(Icons.dns), label: 'Server'),
-          NavigationDestination(icon: Icon(Icons.phone_android), label: 'Client'),
+          NavigationDestination(
+            icon: Icon(Icons.phone_android),
+            label: 'Client',
+          ),
           NavigationDestination(icon: Icon(Icons.search), label: 'Scanner'),
         ],
       ),
@@ -186,7 +194,8 @@ class ServerPage extends StatefulWidget {
   State<ServerPage> createState() => _ServerPageState();
 }
 
-class _ServerPageState extends State<ServerPage> with AutomaticKeepAliveClientMixin {
+class _ServerPageState extends State<ServerPage>
+    with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
 
@@ -198,7 +207,7 @@ class _ServerPageState extends State<ServerPage> with AutomaticKeepAliveClientMi
   final _tokenController = TextEditingController(text: 'secret123');
   List<Client> _connectedClients = [];
   StreamSubscription? _clientsSubscription;
-  
+
   // Delegate toggles
   bool _useTokenAuth = false;
   bool _useConnectionLogging = true;
@@ -218,7 +227,10 @@ class _ServerPageState extends State<ServerPage> with AutomaticKeepAliveClientMi
 
   void _addLog(String message) {
     setState(() {
-      _logs.insert(0, '${DateTime.now().toString().substring(11, 19)} - $message');
+      _logs.insert(
+        0,
+        '${DateTime.now().toString().substring(11, 19)} - $message',
+      );
       if (_logs.length > 50) _logs.removeLast();
     });
   }
@@ -258,7 +270,9 @@ class _ServerPageState extends State<ServerPage> with AutomaticKeepAliveClientMi
       await _server!.start(host, port: port);
       _addLog('Server started at ${_server!.address}');
       if (_useTokenAuth) {
-        _addLog('Token authentication enabled (token: ${_tokenController.text})');
+        _addLog(
+          'Token authentication enabled (token: ${_tokenController.text})',
+        );
       }
       if (_useUsernameValidation) {
         _addLog('Username validation enabled');
@@ -277,7 +291,9 @@ class _ServerPageState extends State<ServerPage> with AutomaticKeepAliveClientMi
 
       // Listen for messages from clients
       _server!.messageStream.listen((message) {
-        _addLog('Message received: ${message.toString().substring(0, message.toString().length > 50 ? 50 : message.toString().length)}...');
+        _addLog(
+          'Message received: ${message.toString().substring(0, message.toString().length > 50 ? 50 : message.toString().length)}...',
+        );
       });
 
       setState(() {});
@@ -323,11 +339,17 @@ class _ServerPageState extends State<ServerPage> with AutomaticKeepAliveClientMi
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Server Configuration', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const Text(
+                    'Server Configuration',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
                   const SizedBox(height: 16),
                   TextField(
                     controller: _nameController,
-                    decoration: const InputDecoration(labelText: 'Server Name', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(
+                      labelText: 'Server Name',
+                      border: OutlineInputBorder(),
+                    ),
                     enabled: !isRunning,
                   ),
                   const SizedBox(height: 12),
@@ -337,7 +359,10 @@ class _ServerPageState extends State<ServerPage> with AutomaticKeepAliveClientMi
                         flex: 2,
                         child: TextField(
                           controller: _hostController,
-                          decoration: const InputDecoration(labelText: 'Host', border: OutlineInputBorder()),
+                          decoration: const InputDecoration(
+                            labelText: 'Host',
+                            border: OutlineInputBorder(),
+                          ),
                           enabled: !isRunning,
                         ),
                       ),
@@ -345,7 +370,10 @@ class _ServerPageState extends State<ServerPage> with AutomaticKeepAliveClientMi
                       Expanded(
                         child: TextField(
                           controller: _portController,
-                          decoration: const InputDecoration(labelText: 'Port', border: OutlineInputBorder()),
+                          decoration: const InputDecoration(
+                            labelText: 'Port',
+                            border: OutlineInputBorder(),
+                          ),
                           keyboardType: TextInputType.number,
                           enabled: !isRunning,
                         ),
@@ -355,11 +383,17 @@ class _ServerPageState extends State<ServerPage> with AutomaticKeepAliveClientMi
                   const SizedBox(height: 16),
                   const Divider(),
                   const SizedBox(height: 8),
-                  const Text('Security & Validation', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                  const Text(
+                    'Security & Validation',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                  ),
                   const SizedBox(height: 12),
                   CheckboxListTile(
                     value: _useTokenAuth,
-                    onChanged: isRunning ? null : (value) => setState(() => _useTokenAuth = value ?? false),
+                    onChanged: isRunning
+                        ? null
+                        : (value) =>
+                              setState(() => _useTokenAuth = value ?? false),
                     title: const Text('Token Authentication'),
                     subtitle: const Text('Require token in query params'),
                     dense: true,
@@ -382,15 +416,25 @@ class _ServerPageState extends State<ServerPage> with AutomaticKeepAliveClientMi
                   ],
                   CheckboxListTile(
                     value: _useConnectionLogging,
-                    onChanged: isRunning ? null : (value) => setState(() => _useConnectionLogging = value ?? false),
+                    onChanged: isRunning
+                        ? null
+                        : (value) => setState(
+                            () => _useConnectionLogging = value ?? false,
+                          ),
                     title: const Text('Connection Logging'),
-                    subtitle: const Text('Log client connect/disconnect events'),
+                    subtitle: const Text(
+                      'Log client connect/disconnect events',
+                    ),
                     dense: true,
                     contentPadding: EdgeInsets.zero,
                   ),
                   CheckboxListTile(
                     value: _useUsernameValidation,
-                    onChanged: isRunning ? null : (value) => setState(() => _useUsernameValidation = value ?? false),
+                    onChanged: isRunning
+                        ? null
+                        : (value) => setState(
+                            () => _useUsernameValidation = value ?? false,
+                          ),
                     title: const Text('Username Validation'),
                     subtitle: const Text('Require username (min 3 chars)'),
                     dense: true,
@@ -398,7 +442,11 @@ class _ServerPageState extends State<ServerPage> with AutomaticKeepAliveClientMi
                   ),
                   CheckboxListTile(
                     value: _useMessageValidation,
-                    onChanged: isRunning ? null : (value) => setState(() => _useMessageValidation = value ?? false),
+                    onChanged: isRunning
+                        ? null
+                        : (value) => setState(
+                            () => _useMessageValidation = value ?? false,
+                          ),
                     title: const Text('Message Validation'),
                     subtitle: const Text('Limit message length (500 chars)'),
                     dense: true,
@@ -440,7 +488,12 @@ class _ServerPageState extends State<ServerPage> with AutomaticKeepAliveClientMi
                           const Icon(Icons.check_circle, color: Colors.green),
                           const SizedBox(width: 8),
                           Expanded(
-                            child: Text('Running at ${_server!.address}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                            child: Text(
+                              'Running at ${_server!.address}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -457,12 +510,21 @@ class _ServerPageState extends State<ServerPage> with AutomaticKeepAliveClientMi
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Connected Clients (${_connectedClients.length})', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  Text(
+                    'Connected Clients (${_connectedClients.length})',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                   const SizedBox(height: 8),
                   ConstrainedBox(
                     constraints: const BoxConstraints(maxHeight: 120),
                     child: _connectedClients.isEmpty
-                        ? const SizedBox(height: 60, child: Center(child: Text('No clients connected')))
+                        ? const SizedBox(
+                            height: 60,
+                            child: Center(child: Text('No clients connected')),
+                          )
                         : ListView.builder(
                             shrinkWrap: true,
                             itemCount: _connectedClients.length,
@@ -472,7 +534,11 @@ class _ServerPageState extends State<ServerPage> with AutomaticKeepAliveClientMi
                                 dense: true,
                                 leading: const Icon(Icons.person),
                                 title: Text(client.uid),
-                                subtitle: Text(client.details.isNotEmpty ? client.details.toString() : 'No details'),
+                                subtitle: Text(
+                                  client.details.isNotEmpty
+                                      ? client.details.toString()
+                                      : 'No details',
+                                ),
                               );
                             },
                           ),
@@ -483,7 +549,11 @@ class _ServerPageState extends State<ServerPage> with AutomaticKeepAliveClientMi
                       children: [
                         Expanded(
                           child: TextField(
-                            decoration: const InputDecoration(labelText: 'Broadcast Message', border: OutlineInputBorder(), isDense: true),
+                            decoration: const InputDecoration(
+                              labelText: 'Broadcast Message',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
                             onSubmitted: (value) {
                               if (value.isNotEmpty) {
                                 _broadcastMessage(value);
@@ -499,7 +569,10 @@ class _ServerPageState extends State<ServerPage> with AutomaticKeepAliveClientMi
             ),
           ),
           const SizedBox(height: 16),
-          const Text('Server Logs', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          const Text(
+            'Server Logs',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 8),
           SizedBox(
             height: 300,
@@ -510,8 +583,17 @@ class _ServerPageState extends State<ServerPage> with AutomaticKeepAliveClientMi
                       itemCount: _logs.length,
                       itemBuilder: (context, index) {
                         return Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                          child: Text(_logs[index], style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 4,
+                          ),
+                          child: Text(
+                            _logs[index],
+                            style: const TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 12,
+                            ),
+                          ),
                         );
                       },
                     ),
@@ -531,18 +613,24 @@ class ClientPage extends StatefulWidget {
   State<ClientPage> createState() => _ClientPageState();
 }
 
-class _ClientPageState extends State<ClientPage> with AutomaticKeepAliveClientMixin {
+class _ClientPageState extends State<ClientPage>
+    with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
 
   Client? _client;
   final List<String> _messages = [];
   final _urlController = TextEditingController(text: 'ws://127.0.0.1:8080/ws');
-  final _usernameController = TextEditingController(text: 'User_${DateTime.now().millisecondsSinceEpoch % 1000}');
+  final _usernameController = TextEditingController(
+    text: 'User_${DateTime.now().millisecondsSinceEpoch % 1000}',
+  );
   final _tokenController = TextEditingController(text: 'secret123');
   final _messageController = TextEditingController();
   bool _isConnected = false;
   bool _useToken = false;
+  bool _useAutoReconnect = false;
+  ClientConnectionStatus _connectionStatus =
+      ClientConnectionStatus.disconnected;
   StreamSubscription? _connectionSubscription;
   StreamSubscription? _messageSubscription;
 
@@ -560,7 +648,10 @@ class _ClientPageState extends State<ClientPage> with AutomaticKeepAliveClientMi
 
   void _addMessage(String message) {
     setState(() {
-      _messages.insert(0, '${DateTime.now().toString().substring(11, 19)} - $message');
+      _messages.insert(
+        0,
+        '${DateTime.now().toString().substring(11, 19)} - $message',
+      );
       if (_messages.length > 50) _messages.removeLast();
     });
   }
@@ -573,25 +664,50 @@ class _ClientPageState extends State<ClientPage> with AutomaticKeepAliveClientMi
         'device': 'Flutter App',
         'platform': 'Mobile',
       };
-      
+
       // Add token to details if enabled (this will be added as query parameter)
       if (_useToken) {
         details['token'] = _tokenController.text;
       }
-      
-      _client = Client(details: details);
+
+      // Create client with optional auto-reconnect
+      _client = Client(
+        details: details,
+        clientReconnectionDelegate: _useAutoReconnect
+            ? ExponentialBackoffReconnect(
+                maxAttempts: 5,
+                initialDelay: Duration(seconds: 1),
+                maxDelay: Duration(seconds: 30),
+              )
+            : null,
+      );
 
       await _client!.connect(_urlController.text);
       _addMessage('Connected! Client ID: ${_client!.uid}');
       if (_useToken) {
         _addMessage('Using token: ${_tokenController.text}');
       }
+      if (_useAutoReconnect) {
+        _addMessage('Auto-reconnect enabled (max 5 attempts)');
+      }
 
-      _connectionSubscription = _client!.connectionStream.listen((isConnected) {
+      _connectionSubscription = _client!.connectionStream.listen((status) {
         setState(() {
-          _isConnected = isConnected;
+          _connectionStatus = status;
+          _isConnected = status.isConnected;
         });
-        _addMessage('Connection status: ${isConnected ? "Connected" : "Disconnected"}');
+
+        switch (status) {
+          case ClientConnectionStatus.connected:
+            _addMessage('Status: Connected');
+            break;
+          case ClientConnectionStatus.connecting:
+            _addMessage('Status: Connecting...');
+            break;
+          case ClientConnectionStatus.disconnected:
+            _addMessage('Status: Disconnected');
+            break;
+        }
       });
 
       _messageSubscription = _client!.messageStream.listen((message) {
@@ -599,10 +715,15 @@ class _ClientPageState extends State<ClientPage> with AutomaticKeepAliveClientMi
       });
 
       setState(() {
+        _connectionStatus = ClientConnectionStatus.connected;
         _isConnected = true;
       });
     } catch (e) {
       _addMessage('Error connecting: $e');
+      setState(() {
+        _connectionStatus = ClientConnectionStatus.disconnected;
+        _isConnected = false;
+      });
     }
   }
 
@@ -613,6 +734,7 @@ class _ClientPageState extends State<ClientPage> with AutomaticKeepAliveClientMi
       await _client?.disconnect();
       _addMessage('Disconnected');
       setState(() {
+        _connectionStatus = ClientConnectionStatus.disconnected;
         _isConnected = false;
         _client = null;
       });
@@ -657,11 +779,17 @@ class _ClientPageState extends State<ClientPage> with AutomaticKeepAliveClientMi
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Client Configuration', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const Text(
+                    'Client Configuration',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
                   const SizedBox(height: 16),
                   TextField(
                     controller: _usernameController,
-                    decoration: const InputDecoration(labelText: 'Username', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(
+                      labelText: 'Username',
+                      border: OutlineInputBorder(),
+                    ),
                     enabled: !_isConnected,
                   ),
                   const SizedBox(height: 12),
@@ -670,14 +798,17 @@ class _ClientPageState extends State<ClientPage> with AutomaticKeepAliveClientMi
                     decoration: const InputDecoration(
                       labelText: 'WebSocket URL',
                       border: OutlineInputBorder(),
-                      helperText: 'Token will be added automatically if enabled',
+                      helperText:
+                          'Token will be added automatically if enabled',
                     ),
                     enabled: !_isConnected,
                   ),
                   const SizedBox(height: 12),
                   CheckboxListTile(
                     value: _useToken,
-                    onChanged: _isConnected ? null : (value) => setState(() => _useToken = value ?? false),
+                    onChanged: _isConnected
+                        ? null
+                        : (value) => setState(() => _useToken = value ?? false),
                     title: const Text('Use Token Authentication'),
                     subtitle: const Text('Add token to query parameters'),
                     dense: true,
@@ -698,6 +829,20 @@ class _ClientPageState extends State<ClientPage> with AutomaticKeepAliveClientMi
                       ),
                     ),
                   ],
+                  CheckboxListTile(
+                    value: _useAutoReconnect,
+                    onChanged: _isConnected
+                        ? null
+                        : (value) => setState(
+                            () => _useAutoReconnect = value ?? false,
+                          ),
+                    title: const Text('Enable Auto-Reconnect'),
+                    subtitle: const Text(
+                      'Automatically reconnect if connection is lost',
+                    ),
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                  ),
                   const SizedBox(height: 16),
                   Row(
                     children: [
@@ -718,26 +863,87 @@ class _ClientPageState extends State<ClientPage> with AutomaticKeepAliveClientMi
                       ),
                     ],
                   ),
-                  if (_isConnected) ...[
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.green.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.green),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.check_circle, color: Colors.green),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text('Connected as ${_client?.uid}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                          ),
-                        ],
+                  const SizedBox(height: 12),
+                  // Connection status indicator
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color:
+                          _connectionStatus == ClientConnectionStatus.connected
+                          ? Colors.green.withAlpha(25)
+                          : _connectionStatus ==
+                                ClientConnectionStatus.connecting
+                          ? Colors.orange.withAlpha(25)
+                          : Colors.red.withAlpha(25),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color:
+                            _connectionStatus ==
+                                ClientConnectionStatus.connected
+                            ? Colors.green
+                            : _connectionStatus ==
+                                  ClientConnectionStatus.connecting
+                            ? Colors.orange
+                            : Colors.red,
                       ),
                     ),
-                  ],
+                    child: Row(
+                      children: [
+                        Icon(
+                          _connectionStatus == ClientConnectionStatus.connected
+                              ? Icons.cloud_done
+                              : _connectionStatus ==
+                                    ClientConnectionStatus.connecting
+                              ? Icons.cloud_sync
+                              : Icons.cloud_off,
+                          color:
+                              _connectionStatus ==
+                                  ClientConnectionStatus.connected
+                              ? Colors.green
+                              : _connectionStatus ==
+                                    ClientConnectionStatus.connecting
+                              ? Colors.orange
+                              : Colors.red,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _connectionStatus ==
+                                        ClientConnectionStatus.connected
+                                    ? 'Connected'
+                                    : _connectionStatus ==
+                                          ClientConnectionStatus.connecting
+                                    ? 'Connecting...'
+                                    : 'Disconnected',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color:
+                                      _connectionStatus ==
+                                          ClientConnectionStatus.connected
+                                      ? Colors.green.shade700
+                                      : _connectionStatus ==
+                                            ClientConnectionStatus.connecting
+                                      ? Colors.orange.shade700
+                                      : Colors.red.shade700,
+                                ),
+                              ),
+                              if (_isConnected && _client != null)
+                                Text(
+                                  'Client ID: ${_client!.uid}',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -750,20 +956,39 @@ class _ClientPageState extends State<ClientPage> with AutomaticKeepAliveClientMi
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Send Message', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    const Text(
+                      'Send Message',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(height: 12),
                     Row(
                       children: [
                         Expanded(
                           child: TextField(
                             controller: _messageController,
-                            decoration: const InputDecoration(labelText: 'Message', border: OutlineInputBorder(), isDense: true),
+                            decoration: const InputDecoration(
+                              labelText: 'Message',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
                             onSubmitted: _sendMessage,
                           ),
                         ),
                         const SizedBox(width: 8),
-                        IconButton.filled(onPressed: () => _sendMessage(_messageController.text), icon: const Icon(Icons.send), tooltip: 'Send Text'),
-                        IconButton.filledTonal(onPressed: _sendJsonMessage, icon: const Icon(Icons.code), tooltip: 'Send as JSON'),
+                        IconButton.filled(
+                          onPressed: () =>
+                              _sendMessage(_messageController.text),
+                          icon: const Icon(Icons.send),
+                          tooltip: 'Send Text',
+                        ),
+                        IconButton.filledTonal(
+                          onPressed: _sendJsonMessage,
+                          icon: const Icon(Icons.code),
+                          tooltip: 'Send as JSON',
+                        ),
                       ],
                     ),
                   ],
@@ -772,7 +997,10 @@ class _ClientPageState extends State<ClientPage> with AutomaticKeepAliveClientMi
             ),
             const SizedBox(height: 16),
           ],
-          const Text('Messages', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          const Text(
+            'Messages',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 8),
           SizedBox(
             height: 300,
@@ -783,8 +1011,17 @@ class _ClientPageState extends State<ClientPage> with AutomaticKeepAliveClientMi
                       itemCount: _messages.length,
                       itemBuilder: (context, index) {
                         return Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                          child: Text(_messages[index], style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 4,
+                          ),
+                          child: Text(
+                            _messages[index],
+                            style: const TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 12,
+                            ),
+                          ),
                         );
                       },
                     ),
@@ -804,7 +1041,8 @@ class ScannerPage extends StatefulWidget {
   State<ScannerPage> createState() => _ScannerPageState();
 }
 
-class _ScannerPageState extends State<ScannerPage> with AutomaticKeepAliveClientMixin {
+class _ScannerPageState extends State<ScannerPage>
+    with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
 
@@ -841,7 +1079,9 @@ class _ScannerPageState extends State<ScannerPage> with AutomaticKeepAliveClient
         },
         onError: (error) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Scan error: $error')));
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text('Scan error: $error')));
           }
         },
       );
@@ -850,7 +1090,9 @@ class _ScannerPageState extends State<ScannerPage> with AutomaticKeepAliveClient
         _isScanning = false;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -865,7 +1107,7 @@ class _ScannerPageState extends State<ScannerPage> with AutomaticKeepAliveClient
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -877,7 +1119,10 @@ class _ScannerPageState extends State<ScannerPage> with AutomaticKeepAliveClient
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Scanner Configuration', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const Text(
+                    'Scanner Configuration',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
                   const SizedBox(height: 16),
                   Row(
                     children: [
@@ -897,7 +1142,10 @@ class _ScannerPageState extends State<ScannerPage> with AutomaticKeepAliveClient
                       Expanded(
                         child: TextField(
                           controller: _portController,
-                          decoration: const InputDecoration(labelText: 'Port', border: OutlineInputBorder()),
+                          decoration: const InputDecoration(
+                            labelText: 'Port',
+                            border: OutlineInputBorder(),
+                          ),
                           keyboardType: TextInputType.number,
                           enabled: !_isScanning,
                         ),
@@ -939,7 +1187,10 @@ class _ScannerPageState extends State<ScannerPage> with AutomaticKeepAliveClient
             ),
           ),
           const SizedBox(height: 16),
-          Text('Discovered Servers (${_discoveredServers.length})', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          Text(
+            'Discovered Servers (${_discoveredServers.length})',
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 8),
           SizedBox(
             height: 400,
@@ -949,11 +1200,20 @@ class _ScannerPageState extends State<ScannerPage> with AutomaticKeepAliveClient
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.search_off, size: 64, color: Colors.grey.shade400),
+                          Icon(
+                            Icons.search_off,
+                            size: 64,
+                            color: Colors.grey.shade400,
+                          ),
                           const SizedBox(height: 16),
                           Text(
-                            _isScanning ? 'Scanning for servers...' : 'No servers found',
-                            style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+                            _isScanning
+                                ? 'Scanning for servers...'
+                                : 'No servers found',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.grey.shade600,
+                            ),
                           ),
                         ],
                       ),
@@ -967,7 +1227,11 @@ class _ScannerPageState extends State<ScannerPage> with AutomaticKeepAliveClient
                         margin: const EdgeInsets.only(bottom: 8),
                         child: ListTile(
                           leading: const Icon(Icons.dns, color: Colors.green),
-                          title: Text(server.details['name']?.toString() ?? 'Unknown Server', style: const TextStyle(fontWeight: FontWeight.bold)),
+                          title: Text(
+                            server.details['name']?.toString() ??
+                                'Unknown Server',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -977,7 +1241,10 @@ class _ScannerPageState extends State<ScannerPage> with AutomaticKeepAliveClient
                                 const SizedBox(height: 4),
                                 Text(
                                   'Details: ${server.details.entries.map((e) => '${e.key}: ${e.value}').join(', ')}',
-                                  style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade700,
+                                  ),
                                 ),
                               ],
                             ],
@@ -988,9 +1255,12 @@ class _ScannerPageState extends State<ScannerPage> with AutomaticKeepAliveClient
                             onPressed: () {
                               // In a real app, you'd copy to clipboard
                               if (mounted) {
-                                ScaffoldMessenger.of(
-                                  context,
-                                ).showSnackBar(SnackBar(content: Text('URL copied: ${server.path}'), duration: const Duration(seconds: 2)));
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('URL copied: ${server.path}'),
+                                    duration: const Duration(seconds: 2),
+                                  ),
+                                );
                               }
                             },
                           ),

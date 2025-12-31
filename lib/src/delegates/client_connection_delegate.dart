@@ -1,7 +1,7 @@
 part of '../source.dart';
 
 /// Abstract class that defines the contract for handling client connections
-abstract class ClientConnectionDelegate {
+abstract interface class ClientConnectionDelegate {
   /// Called when a new client connects via WebSocket
   FutureOr<void> onClientConnected(Client client);
 

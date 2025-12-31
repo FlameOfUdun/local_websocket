@@ -1,7 +1,7 @@
 part of '../source.dart';
 
 /// An abstract class that defines the contract for validating messages from clients.
-abstract class MessageValidationDelegate {
+abstract interface class MessageValidationDelegate {
   /// Validates an incoming message from a client.
   ///
   /// Returns `true` if the message is valid, otherwise returns `false`.
