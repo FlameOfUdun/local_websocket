@@ -9,7 +9,7 @@ class Client {
   final _statusController =
       StreamController<ClientConnectionStatus>.broadcast();
 
-  final ClientReconectionDelegate? _clientReconnectionDelegate;
+  ClientReconectionDelegate? _clientReconnectionDelegate;
   String? _lastConnectionUrl;
   int _reconnectAttempts = 0;
   DateTime? _lastConnectedTime;
@@ -28,10 +28,11 @@ class Client {
   Client.connected({
     required WebSocket socket,
     Map<String, String> details = const {},
+    ClientReconectionDelegate? clientReconnectionDelegate,
   })  : _details = Map.unmodifiable(details),
         _socket = socket,
         _currentStatus = ClientConnectionStatus.connected,
-        _clientReconnectionDelegate = null;
+        _clientReconnectionDelegate = clientReconnectionDelegate;
 
   /// Additional details about the client
   Map<String, String> get details => Map<String, String>.unmodifiable(_details);
@@ -41,6 +42,11 @@ class Client {
 
   /// Stream of incoming messages from the server
   Stream<dynamic> get messageStream => _messageController.stream;
+
+  /// Delegate for handling reconnection logic
+  set clientReconnectionDelegate(ClientReconectionDelegate? delegate) {
+    _clientReconnectionDelegate = delegate;
+  }
 
   /// Stream of connection status changes
   Stream<ClientConnectionStatus> get connectionStream =>
@@ -147,25 +153,27 @@ class Client {
   Future<void> _attemptReconnect() async {
     if (_isReconnecting ||
         _lastConnectionUrl == null ||
-        _clientReconnectionDelegate == null) return;
+        _clientReconnectionDelegate == null) {
+      return;
+    }
 
     _isReconnecting = true;
     final timeSinceLastConnect = _lastConnectedTime != null
         ? DateTime.now().difference(_lastConnectedTime!)
         : Duration.zero;
 
-    final shouldReconnect = await _clientReconnectionDelegate.shouldReconnect(
-        _reconnectAttempts, timeSinceLastConnect);
+    final shouldReconnect = await _clientReconnectionDelegate!
+        .shouldReconnect(_reconnectAttempts, timeSinceLastConnect);
 
     if (!shouldReconnect) {
       _isReconnecting = false;
       _updateStatus(ClientConnectionStatus.disconnected);
-      _clientReconnectionDelegate.onReconnectFailed(_reconnectAttempts);
+      _clientReconnectionDelegate!.onReconnectFailed(_reconnectAttempts);
       return;
     }
 
-    final delay =
-        await _clientReconnectionDelegate.getReconnectDelay(_reconnectAttempts);
+    final delay = await _clientReconnectionDelegate!
+        .getReconnectDelay(_reconnectAttempts);
     await Future.delayed(delay);
 
     if (_shouldStopReconnecting) {
@@ -189,7 +197,7 @@ class Client {
 
       _reconnectAttempts = 0;
       _isReconnecting = false;
-      _clientReconnectionDelegate.onReconnected(_reconnectAttempts);
+      _clientReconnectionDelegate!.onReconnected(_reconnectAttempts);
     } catch (e) {
       _isReconnecting = false;
       await _attemptReconnect();

@@ -4,18 +4,17 @@ part of '../source.dart';
 class Server {
   final bool _echo;
   final Map<String, dynamic> _details;
-  final RequestAuthenticationDelegate? _requestAuthenticationDelegate;
-  final ClientValidationDelegate? _clientValidationDelegate;
-  final ClientConnectionDelegate? _clientConnectionDelegate;
-  final MessageValidationDelegate? _messageValidationDelegate;
   final Set<Client> _clients = {};
   final String _version = '1.0.0';
-
   final _connectionController = StreamController<bool>.broadcast();
   final _clientsController = StreamController<Set<Client>>.broadcast();
   final _messageController = StreamController<dynamic>.broadcast();
 
   HttpServer? _server;
+  RequestAuthenticationDelegate? _requestAuthenticationDelegate;
+  ClientValidationDelegate? _clientValidationDelegate;
+  ClientConnectionDelegate? _clientConnectionDelegate;
+  MessageValidationDelegate? _messageValidationDelegate;
 
   Server({
     bool echo = false,
@@ -45,6 +44,26 @@ class Server {
 
   /// Indicates whether the server is currently running
   bool get isConnected => _server != null;
+
+  /// Sets the request authentication delegate
+  set requestAuthenticationDelegate(RequestAuthenticationDelegate? delegate) {
+    _requestAuthenticationDelegate = delegate;
+  }
+
+  /// Sets the client validation delegate
+  set clientValidationDelegate(ClientValidationDelegate? delegate) {
+    _clientValidationDelegate = delegate;
+  }
+
+  /// Sets the client connection delegate
+  set clientConnectionDelegate(ClientConnectionDelegate? delegate) {
+    _clientConnectionDelegate = delegate;
+  }
+
+  /// Sets the message validation delegate
+  set messageValidationDelegate(MessageValidationDelegate? delegate) {
+    _messageValidationDelegate = delegate;
+  }
 
   /// The address of the running server
   Uri get address {
@@ -111,7 +130,7 @@ class Server {
     // Authenticate request if delegate is provided
     if (_requestAuthenticationDelegate != null) {
       final authResult =
-          await _requestAuthenticationDelegate.authenticateRequest(request);
+          await _requestAuthenticationDelegate!.authenticateRequest(request);
 
       if (!authResult.isSuccess) {
         final response = request.response
@@ -142,7 +161,7 @@ class Server {
     // Validate client if delegate is provided
     if (_clientValidationDelegate != null) {
       final isValid =
-          await _clientValidationDelegate.validateClient(client, request);
+          await _clientValidationDelegate!.validateClient(client, request);
       if (!isValid) {
         await socket.close(3000, 'Client validation failed');
         return;
@@ -161,8 +180,8 @@ class Server {
       (message) async {
         // Validate message if delegate is provided
         if (_messageValidationDelegate != null) {
-          final isValid =
-              await _messageValidationDelegate.validateMessage(client, message);
+          final isValid = await _messageValidationDelegate!
+              .validateMessage(client, message);
           if (!isValid) {
             return;
           }

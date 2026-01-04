@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 0.0.4
+
+- Added individual setters for differet client and server delegates
+
 ## 0.0.3
 
 ### New Features
